@@ -41,9 +41,9 @@ gurupi2016 <- f.separate.events(gurupi2016, 30)
 gurupi2016 <- distinct(gurupi2016, Camera.Trap.Name, bin, grp, .keep_all=TRUE) # keep only independent records
 
 ## ---- 3- Load covariate data-------
-# Still dont have the covariates, so generate dummy altitude and slope covariates just to test the code
+# Still dont have the covariates, so create dummy variaables just to test the code
 Camera.Trap.Name <- sort(unique(gurupi2016$Camera.Trap.Name))
-altitude <- rnorm(length(cams)); slope <- rexp(length(cams),1/2500)
+altitude <- rnorm(length(Camera.Trap.Name)); slope <- rexp(length(Camera.Trap.Name),1/2500) # dummy variables
 covsRBG <- data.frame(Camera.Trap.Name, altitude, slope)
 
 # We just need the cameras operating in 2016. Which ones are they?
