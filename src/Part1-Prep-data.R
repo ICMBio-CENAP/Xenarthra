@@ -31,7 +31,7 @@ gurupi2016$Camera.End.Date <- as.Date(gurupi2016$Camera.End.Date)
 #gurupi2016$Photo.Time <- as.POSIXct(paste(gurupi2016$Photo.Date, gurupi2016$Photo.Time))
 
 # create a few additional columns
-gurupi2016$bin <- paste(gurupi2016$Genus,gurupi2016$Species, sep=" ")
+gurupi2016$bin <- factor(paste(gurupi2016$Genus,gurupi2016$Species, sep=" "))
 gurupi2016$td.photo <- ymd_hms(paste(gurupi2016$Photo.Date, gurupi2016$Photo.Time, sep=" "))
 gurupi2016$Start.Date <- gurupi2016$Camera.Start.Date
 gurupi2016$End.Date <- gurupi2016$Camera.End.Date
@@ -57,6 +57,7 @@ p <- ggplot(imgsPerCT, aes(x = reorder(Camera.Trap.Name, -n), y = n)) + geom_col
 p
 
 ## ----plot deployment in time---------------------------------------------
+
 # Look at how camera traps were deployed
 # First create a table
 tabCTN_PD <- with(gurupi2016, table(Camera.Trap.Name, Photo.Date))
@@ -68,7 +69,27 @@ p <- ggplot(tabCTN_PD, aes(y = Camera.Trap.Name, x = Photo.Date)) + geom_raster(
 p
 
 
-## Activity patterns
+##---- Species richness ---------------------------
+unique(gurupi2016$bin)
+
+#Remove the blank species
+# Let's do this in a copy of gurupi2016
+gurupi2016.copy <- gurupi2016
+
+gurupi2016.copy$bin <- droplevels(gurupi2016.copy$bin, exclude = " ")
+unique(gurupi2016.copy$bin)
+
+# How often they show up in the camera traps
+imgsPerSp <- gurupi2016.copy %>% group_by(bin) %>% summarize(n = n()) %>% arrange(desc(n))
+print(imgsPerSp, n=Inf)
+
+#plot
+ggplot(imgsPerSp, aes(x = reorder(bin, -n), y = n)) + geom_col() + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + xlab("Species") + ylab("Number of images")
+
+
+
+##---- Activity patterns ---------------------------
+
 # Write a couple of functions for activity patterns
 calcActivity <- function(dataset, speciesName, threshold){
   # Extract the data from species
@@ -116,7 +137,7 @@ compareAct(list(actMod_Myrtri[[1]],actMod_Tamtet[[1]]))
 
 
 
-## Generate spatial distributions ----------------------------------
+##---- Generate spatial distributions ---------------------------
 
 # Start with provide the lon/lat range of the data
 lon <- range(gurupi2016$Longitude)
