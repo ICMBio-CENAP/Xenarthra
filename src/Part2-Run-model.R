@@ -11,13 +11,6 @@
 library(dplyr)
 library(lubridate)
 library(reshape2)
-library(activity)
-library(ggplot2)
-library(ggmap)
-
-library(dplyr)
-library(lubridate)
-library(reshape2)
 library(ggplot2)
 library(unmarked)
 library(here)
@@ -110,7 +103,14 @@ mod_pred <- data.frame(mod_pred, elevation = newdata)
 # Transform elevation back to original scale
 mod_pred <- mutate(mod_pred, elev = sd(covsRBG$altitude)*norm.altitude + mean(covsRBG$altitude))
 mod_pred
+
+# plot it
 ggplot(mod_pred, aes(x = elev, y = Predicted)) + geom_line() + geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.4, fill = "blue") + xlab("Elevation") + ylab("Detection probability")
+
+# save as jpeg
+jpeg(here("results", "dummy_elevation_psi.jpg"), width = 800, height = 600) # Open jpeg file
+ggplot(mod_pred, aes(x = elev, y = Predicted)) + geom_line() + geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.4, fill = "blue") + xlab("Elevation") + ylab("Detection probability")
+dev.off()
 
 # Do another model where occupancy is a function of slope and detection is a function of altitude
 occMod2_Myrtri <- occu(~norm.slope ~norm.altitude, umGurupi_Myrtri)
