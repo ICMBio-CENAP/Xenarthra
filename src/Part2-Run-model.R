@@ -18,6 +18,7 @@ library(here)
 
 ##----- 2 - Source files-----
 source(here("bin", "camera trap analysis functions-10-06-18.R")) # using package here to build a path to the subdirectory "bin"
+source(here("bin", "f-matrix-creator-experimental-probably-ok-but-need-check.R"))
 
 ## ---- 3- Load data-------
 gurupi2016 <- read.csv(here("data", "gurupi2016.csv"))
@@ -63,7 +64,8 @@ head(covsRBG)
 # Create a matrix of presence/absence of each species
 # rows are camera trap points (sampling units) and columns are dates
 # Use function f.matrix.creator2 to do this
-paMatsGurupi <- f.matrix.creator2(gurupi2016)
+#paMatsGurupi <- f.matrix.creator2(gurupi2016)
+paMatsGurupi <- f.matrix.creator4(gurupi2016, cams, species, 15)
 
 # This creates a list were each element of the list is a presence/absence matrix for a species
 summary(paMatsGurupi)
