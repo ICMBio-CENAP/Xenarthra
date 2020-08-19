@@ -103,8 +103,12 @@ paMats2017 <- f.matrix.creator4(dataRBG2017, species, 15) # 79 days duration, 15
 
 # check species names
 names(paMats2017)
+
 # Myrmecophaga is the 8th species
 Mtridactyla <- as.data.frame(paMats2017[8]); names(Mtridactyla) <- seq(1:ncol(Mtridactyla))
+
+# Priodontes maximus is the 21th species
+Pmaximus <- as.data.frame(paMats2017[21]); names(Pmaximus) <- seq(1:ncol(Pmaximus))
 
 # function to create species data
 createSppData <- function(x) {
@@ -163,5 +167,9 @@ covars <- merge(covars, trees[,c(2,6,7)], by="Camera.Trap.Name")
 Mtridactyla$Camera.Trap.Name <- rownames(Mtridactyla)
 Mtridactyla <- merge(Mtridactyla, covars, by="Camera.Trap.Name")
 
+Pmaximus$Camera.Trap.Name <- rownames(Pmaximus)
+Pmaximus <- merge(Pmaximus, covars, by="Camera.Trap.Name")
+
 # Save to disk
 saveRDS(Mtridactyla, here("data","Mtridactyla.rds"))
+saveRDS(Pmaximus, here("data","Pmaximus.rds"))
