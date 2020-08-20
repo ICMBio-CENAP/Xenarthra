@@ -161,7 +161,7 @@ trees <- read.csv(here("data", "tree_structure.csv"))
 ## create a single covariates dataframe
 covars <- merge(cover[,c(2,9)], dist.water[,3:4], by="Camera.Trap.Name")
 covars <- merge(covars, slope.elev[,2:4], by="Camera.Trap.Name")
-covars <- merge(covars, trees[,c(2,6,7)], by="Camera.Trap.Name")
+covars <- merge(covars, trees[,c(2,4,6,7)], by="Camera.Trap.Name")
 
 # merge 
 Mtridactyla$Camera.Trap.Name <- rownames(Mtridactyla)

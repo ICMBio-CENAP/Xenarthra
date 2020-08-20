@@ -22,16 +22,24 @@ library(ggplot2)
 #----- 3 - Read and prepare data -----
 Mtridactyla <- readRDS(here("data", "Mtridactyla.rds"))
 Pmaximus <- readRDS(here("data", "Pmaximus.rds"))
-y1 <- Mtridactyla[,2:16]
-y2 <- Pmaximus[,2:16]
+y <- Mtridactyla[,2:16]
+#y <- Pmaximus[,2:16]
 str(y)
-SiteCovs <- Mtridactyla[,17:22]
+SiteCovs <- Mtridactyla[,17:23]
+
+# check corr in SiteCovs
+cor(SiteCovs)
+# elevation and slope 0.7 corr
 
 names(SiteCovs)
+landCover <- SiteCovs[,1]
 distWater <- SiteCovs[,2]
 slope <- SiteCovs[,3]
 elevation <- SiteCovs[,4]
-treeDensity <- SiteCovs[,6]
+treeBurned <- SiteCovs[,5]
+basalArea <- SiteCovs[,6]
+treeDensity <- SiteCovs[,7]
+
 
 # Standardize covariates
 mean.slope <- mean(slope, na.rm = TRUE)
@@ -49,6 +57,11 @@ sd.elevation <- sd(elevation[!is.na(elevation)])
 elevation <- (elevation-mean.elevation)/sd.elevation     # Standardise elevation
 elevation[is.na(elevation)] <- 0               # Impute zeroes (means)
 
+mean.treeBurned <- mean(treeBurned, na.rm = TRUE)
+sd.treeBurned <- sd(treeBurned[!is.na(treeBurned)])
+treeBurned <- (treeBurned-mean.treeBurned)/sd.treeBurned     # Standardise treeBurned
+treeBurned[is.na(treeBurned)] <- 0               # Impute zeroes (means)
+
 mean.treeDensity <- mean(treeDensity, na.rm = TRUE)
 sd.treeDensity <- sd(treeDensity[!is.na(treeDensity)])
 treeDensity <- (treeDensity-mean.treeDensity)/sd.treeDensity     # Standardise treeDensity
@@ -65,9 +78,9 @@ model {
 # Priors
 alpha.psi ~ dnorm(0, 0.01)
 beta1.psi ~ dnorm(0, 0.01) # dist.water
-beta2.psi ~ dnorm(0, 0.01) # slope
-beta3.psi ~ dnorm(0, 0.01) # elevation
-beta4.psi ~ dnorm(0, 0.01) # tree.density
+beta2.psi ~ dnorm(0, 0.01) # elevation
+beta3.psi ~ dnorm(0, 0.01) # tree.density
+beta4.psi ~ dnorm(0, 0.01) # burned.trees
 alpha.p ~ dnorm(0, 0.01)
 #beta1.p ~ dnorm(0, 0.01)
 #beta2.p ~ dnorm(0, 0.01)
@@ -80,7 +93,7 @@ for (i in 1:R) {
    z[i] ~ dbern(psi[i])                # True occurrence z at site i
    psi[i] <- 1 / (1 + exp(-lpsi.lim[i]))
    lpsi.lim[i] <- min(999, max(-999, lpsi[i]))
-   lpsi[i] <- alpha.psi + beta1.psi * distWater[i] + beta2.psi * slope[i] + beta3.psi * elevation[i] + beta4.psi * treeDensity[i]
+   lpsi[i] <- alpha.psi + beta1.psi * distWater[i] + beta2.psi * elevation[i] + beta3.psi * treeDensity[i] + beta4.psi * treeBurned[i]
 
    # Observation model for the observations
    for (j in 1:T) {
@@ -101,12 +114,10 @@ mean.p <- exp(alpha.p) / (1 + exp(alpha.p))    # Sort of average detection
 sink()
 
 # Bundle data
-dataMtridactyla <- list(y = y1, R = nrow(y1), T = ncol(y1), distWater = distWater, slope = slope, elevation = elevation, treeDensity = treeDensity)
-dataPmaximus <- list(y = y2, R = nrow(y2), T = ncol(y2), distWater = distWater, slope = slope, elevation = elevation, treeDensity = treeDensity)
+dataJAGS <- list(y = y, R = nrow(y), T = ncol(y), distWater=distWater, elevation=elevation, treeDensity=treeDensity, treeBurned=treeBurned)
 
 # Initial values
-zst <- apply(y1, 1, max, na.rm = TRUE)	# Good starting values crucial
-#zst <- apply(y2, 1, max, na.rm = TRUE)	# Good starting values crucial
+zst <- apply(y, 1, max, na.rm = TRUE)	# Good starting values crucial
 zst[zst == -Inf] <- 0
 inits <- function(){list(z = zst, alpha.psi=runif(1, -3, 3), alpha.p = runif(1, -3, 3))}
 
@@ -120,123 +131,47 @@ nb <- 20000
 nc <- 3
 
 # Call JAGS from R (BRT < 1 min)
-out1 <- jags(dataMtridactyla, inits, params, here("bin", "model.jags"), n.chains = nc, n.thin = nt, n.iter = ni, n.burnin = nb, working.directory = getwd())
-out2 <- jags(dataPmaximus, inits, params, here("bin", "model.jags"), n.chains = nc, n.thin = nt, n.iter = ni, n.burnin = nb, working.directory = getwd())
+out <- jags(dataJAGS, inits, params, here("bin", "model.jags"), n.chains = nc, n.thin = nt, n.iter = ni, n.burnin = nb, working.directory = getwd())
 
 # Summarize posteriors
-print(out1, dig = 2)
-print(out2, dig = 2)
+print(out, dig = 2)
 
 # Posterior distribution of the number of occupied sites in actual sample
 hist(out$BUGSoutput$sims.list$occ.fs, nclass = 30, col = "gray", main = "", xlab = "Number of occupied sites", )
 #abline(v = 10, lwd = 2) # The observed number
 
 
-#### DAQUI PRA BAIXO FALTA MONTAR
-### EXPLORAR RESULTADOS COM GRAFICOS
-
-
-# Examine how mean species-specific occupancy changes by elevation
-
-# Predict effect of time of day with uncertainty
+# A template for a figure with effect of a covariate on occupancy with uncertainty:
+# Using elevation as a model
 mcmc.sample <- out$BUGSoutput$n.sims
-
-original.elev.pred <- seq(min(elevation), max(elevation), length.out = 30)
-#original.hour.pred <- seq(180, 540, length.out = 30)
+original.elev <- SiteCovs[,4]
+original.elev.pred <- seq(min(original.elev), max(original.elev), length.out = 30)
 elev.pred <- (original.elev.pred - mean.elevation)/sd.elevation
-#hour.pred <- (original.hour.pred - mean.hour)/sd.hour
-p.pred.elev <- plogis(out$BUGSoutput$mean$alpha.psi + out$BUGSoutput$mean$beta3.p * elev.pred))
-#p.pred.hour <- plogis(out$BUGSoutput$mean$alpha.p + out$BUGSoutput$mean$beta3.p * hour.pred + out$BUGSoutput$mean$beta4.p * hour.pred^2 )
-
+p.pred.elev <- rep(NA, length(elev.pred))
+for(i in 1:length(p.pred.elev)) {
+  p.pred.elev[i] <- plogis(out$BUGSoutput$mean$alpha.psi + out$BUGSoutput$mean$beta2.psi*elev.pred[i])
+}
 array.p.pred.elev <- array(NA, dim = c(length(elev.pred), mcmc.sample))
 for (i in 1:mcmc.sample){
-  array.p.pred.elev[,i] <- plogis(out$BUGSoutput$mean$alpha.p + out$BUGSoutput$mean$beta1.p[i] * mean(distWater) + out$BUGSoutput$mean$beta2.p[i] * mean(slope) + out$BUGSoutput$mean$beta3.p[i] * mean(elev.pred) + out$BUGSoutput$mean$beta4.p[i] * mean(treeDensity))
-    #plogis(out$BUGSoutput$sims.list$alpha.p[i] + out$BUGSoutput$sims.list$beta1.p[i] * elev.pred + out$BUGSoutput$sims.list$beta2.p[i] * elev.pred^2)
-  #array.p.pred.hour[,i] <- plogis(out$BUGSoutput$sims.list$alpha.p[i] + out$BUGSoutput$sims.list$beta3.p[i] * hour.pred + out$BUGSoutput$sims.list$beta4.p[i] * hour.pred^2)
+  array.p.pred.elev[,i] <- plogis(out$BUGSoutput$sims.list$alpha.psi[i] + out$BUGSoutput$sims.list$beta2.psi[i]*elev.pred)
 }
 
 # Plot for a subsample of MCMC draws
-sub.set <- sort(sample(1:mcmc.sample, size = 200))
+# write as a function:
+plot.test <- function() {
+  sub.set <- sort(sample(1:mcmc.sample, size = 200))
 
-#par(mfrow = c(2, 1))
-plot(original.elev.pred, p.pred.elev, main = "", ylab = "Occupancy probability", xlab = "Elevation", ylim = c(0, 1), type = "l", lwd = 3, frame.plot = FALSE)
-for (i in sub.set){
-  lines(original.elev.pred, array.p.pred.elev[,i], type = "l", lwd = 1, col = "gray")
-}
-lines(original.elev.pred, p.pred.elev, type = "l", lwd = 3, col = "blue")
-
-plot(original.hour.pred, p.pred.hour, main = "", ylab = "Detection probability", xlab = "Time of day (mins after noon)", ylim = c(0, 1), type = "l", lwd = 3, frame.plot = FALSE)
-for (i in sub.set){
-  lines(original.hour.pred, array.p.pred.hour[,i], type = "l", lwd = 1, col = "gray")
-}
-lines(original.hour.pred, p.pred.hour, type = "l", lwd = 3, col = "blue")
-
-
-
-
-
-
-x = seq(min(elevation), max(elevation), by=0.1) # use max(recovery) instead of 0.06 if all sites are included
-y = (x*sd.elevation) + mean(elevation)
-beta3.psi = out1$BUGSoutput$sims.list$beta3.psi # beta3.psi is the slope for elevation effecta1 <- a1bySpecies
-
-plot(y,y, type="l", ylim=c(0,1), xlim=c(min(y),max(y)), main="Myrmecophaga trydactyla relationship with elevation",
-     col="white", ylab="Occupancy probability", xlab="Elevation (standardized)")
-
-#for (i in 1:n) {
-  elev <- mean(out1$BUGSoutput$sims.list$z) + mean(beta3.psi)*x
-  #lines(y,plogis(LOGGED), type="l", ylim=c(0,1), xlim=c(min(y),max(y)), main=i)
-  lines(y,plogis(elev), type="l", ylim=c(0,1), xlim=c(min(y),max(y)), lwd=0.5, col="dark grey") # because max recovery in logged.occ is 5
-#}
-# add bold line for mean across species
-loggedBold <- mean(elev) + mean(elev)*x
-lines(y,plogis(loggedBold), type="l", ylim=c(0,1), xlim=c(min(y),max(y)), lwd=3) # lwd for line thickness
-
-
-
-#Pstar <- array(NA, dim = c(out$BUGSoutput$n.sims, 10))
-x <- cbind(rep(1, 3000), rep(2, 3000), rep(3, 3000), rep(4, 3000), rep(5, 3000), rep(6, 3000), rep(7, 3000), rep(8, 3000), rep(9, 3000), rep(10, 3000)) 
-for (i in 1:out$BUGSoutput$n.sims) {
-  for (j in 1:10){
-    Pstar[i,j] <- 1 - (1 - out$BUGSoutput$sims.list$mean.p[i])^j
-  } #j
-} #i
-
-boxplot(Pstar ~ x, col = "gray", las = 1, ylab = "Pstar", xlab = "Number of surveys", outline = FALSE)
-abline(h = 0.95, lty = 2, lwd = 2)
-
-par(mfrow = c(2, 1))
-hist(plogis(out$BUGSoutput$sims.list$alpha.psi), nclass = 40, col = "gray", main = "Forest interior", xlab = "Occupancy probability", xlim = c(0, 1))
-hist(plogis(out$BUGSoutput$sims.list$alpha.psi+ out$BUGSoutput$sims.list$beta.psi), nclass = 40, col = "gray", main = "Forest edge", xlab = "Occupancy probability", xlim = c(0, 1))
-
-# Predict effect of time of day with uncertainty
-mcmc.sample <- out$BUGSoutput$n.sims
-
-original.date.pred <- seq(0, 60, length.out = 30)
-original.hour.pred <- seq(180, 540, length.out = 30)
-date.pred <- (original.date.pred - mean.date)/sd.date
-hour.pred <- (original.hour.pred - mean.hour)/sd.hour
-p.pred.date <- plogis(out$BUGSoutput$mean$alpha.p + out$BUGSoutput$mean$beta1.p * date.pred + out$BUGSoutput$mean$beta2.p * date.pred^2 )
-p.pred.hour <- plogis(out$BUGSoutput$mean$alpha.p + out$BUGSoutput$mean$beta3.p * hour.pred + out$BUGSoutput$mean$beta4.p * hour.pred^2 )
-
-array.p.pred.hour <- array.p.pred.date <- array(NA, dim = c(length(hour.pred), mcmc.sample))
-for (i in 1:mcmc.sample){
-  array.p.pred.date[,i] <- plogis(out$BUGSoutput$sims.list$alpha.p[i] + out$BUGSoutput$sims.list$beta1.p[i] * date.pred + out$BUGSoutput$sims.list$beta2.p[i] * date.pred^2)
-  array.p.pred.hour[,i] <- plogis(out$BUGSoutput$sims.list$alpha.p[i] + out$BUGSoutput$sims.list$beta3.p[i] * hour.pred + out$BUGSoutput$sims.list$beta4.p[i] * hour.pred^2)
+  plot(original.elev.pred, p.pred.elev, main = "", ylab = "Occupancy probability", xlab = "Elevation (m)", ylim = c(0, 1), type = "l", lwd = 3, frame.plot = FALSE)
+  for (i in sub.set){
+    lines(original.elev.pred, array.p.pred.elev[,i], type = "l", lwd = 1, col = "gray")
+  }
+  lines(original.elev.pred, p.pred.elev, type = "l", lwd = 3, col = "blue")
 }
 
-# Plot for a subsample of MCMC draws
-sub.set <- sort(sample(1:ni, size = 200))
+plot.test()
 
-par(mfrow = c(2, 1))
-plot(original.date.pred, p.pred.date, main = "", ylab = "Detection probability", xlab = "Date (1 = 1 July)", ylim = c(0, 1), type = "l", lwd = 3, frame.plot = FALSE)
-for (i in sub.set){
-  lines(original.date.pred, array.p.pred.date[,i], type = "l", lwd = 1, col = "gray")
-}
-lines(original.date.pred, p.pred.date, type = "l", lwd = 3, col = "blue")
+# save as jpeg
+jpeg(here("results", "elevation_effect_test.jpg"), width = 800, height = 400) # Open jpeg file
+plot.test()
+dev.off()
 
-plot(original.hour.pred, p.pred.hour, main = "", ylab = "Detection probability", xlab = "Time of day (mins after noon)", ylim = c(0, 1), type = "l", lwd = 3, frame.plot = FALSE)
-for (i in sub.set){
-  lines(original.hour.pred, array.p.pred.hour[,i], type = "l", lwd = 1, col = "gray")
-}
-lines(original.hour.pred, p.pred.hour, type = "l", lwd = 3, col = "blue")
