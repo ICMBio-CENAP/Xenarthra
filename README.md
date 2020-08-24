@@ -16,7 +16,7 @@ Para artigo em preparação sobre tamanduas e tatus na REBIO
 
 <img src="results/Myrmecophaga tridactyla.jpg" title="Myrmecophaga tridactyla, 2016 to 2019" width="500">
 
-<img src="results/elevation_effect_test.jpg" title="Dummy result" width="500">
+<img src="results/elevation_effect_Pmaximus.jpg" title="Dummy result" width="500">
 
 # Contato
 Se tiver questões entre em contato com <elildojr@gmail.com>
