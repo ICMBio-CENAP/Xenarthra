@@ -3,10 +3,11 @@ model {
 
 # Priors
 alpha.psi ~ dnorm(0, 0.01)
-beta1.psi ~ dnorm(0, 0.01) # dist.water
-beta2.psi ~ dnorm(0, 0.01) # elevation
-beta3.psi ~ dnorm(0, 0.01) # tree.density
-beta4.psi ~ dnorm(0, 0.01) # burned.trees
+beta1.psi ~ dnorm(0, 0.01) # distEdge
+beta2.psi ~ dnorm(0, 0.01) # distWater
+beta3.psi ~ dnorm(0, 0.01) # elevation
+beta4.psi ~ dnorm(0, 0.01) # basalArea
+beta5.psi ~ dnorm(0, 0.01) # treeBurned
 alpha.p ~ dnorm(0, 0.01)
 #beta1.p ~ dnorm(0, 0.01)
 #beta2.p ~ dnorm(0, 0.01)
@@ -19,7 +20,7 @@ for (i in 1:R) {
    z[i] ~ dbern(psi[i])                # True occurrence z at site i
    psi[i] <- 1 / (1 + exp(-lpsi.lim[i]))
    lpsi.lim[i] <- min(999, max(-999, lpsi[i]))
-   lpsi[i] <- alpha.psi + beta1.psi * distWater[i] + beta2.psi * elevation[i] + beta3.psi * treeDensity[i] + beta4.psi * treeBurned[i]
+   lpsi[i] <- alpha.psi + beta1.psi*distEdge[i] + beta2.psi*distWater[i] + beta3.psi*elevation[i] + beta4.psi*basalArea[i] + beta5.psi*treeBurned[i]
 
    # Observation model for the observations
    for (j in 1:T) {

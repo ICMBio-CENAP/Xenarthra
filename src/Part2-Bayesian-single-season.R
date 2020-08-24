@@ -20,12 +20,13 @@ library(ggplot2)
 
 
 #----- 3 - Read and prepare data -----
-Mtridactyla <- readRDS(here("data", "Mtridactyla.rds"))
+#Mtridactyla <- readRDS(here("data", "Mtridactyla.rds"))
 Pmaximus <- readRDS(here("data", "Pmaximus.rds"))
-y <- Mtridactyla[,2:16]
-#y <- Pmaximus[,2:16]
+#y <- Mtridactyla[,2:16]
+y <- Pmaximus[,2:16]
 str(y)
-SiteCovs <- Mtridactyla[,17:23]
+#SiteCovs <- Mtridactyla[,17:24]
+SiteCovs <- Pmaximus[,17:24]
 
 # check corr in SiteCovs
 cor(SiteCovs)
@@ -34,11 +35,12 @@ cor(SiteCovs)
 names(SiteCovs)
 landCover <- SiteCovs[,1]
 distWater <- SiteCovs[,2]
-slope <- SiteCovs[,3]
-elevation <- SiteCovs[,4]
-treeBurned <- SiteCovs[,5]
-basalArea <- SiteCovs[,6]
-treeDensity <- SiteCovs[,7]
+distEdge <- SiteCovs[,3]
+slope <- SiteCovs[,4]
+elevation <- SiteCovs[,5]
+treeBurned <- SiteCovs[,6]
+basalArea <- SiteCovs[,7]
+treeDensity <- SiteCovs[,8]
 
 
 # Standardize covariates
@@ -51,6 +53,11 @@ mean.distWater <- mean(distWater, na.rm = TRUE)
 sd.distWater <- sd(distWater[!is.na(distWater)])
 distWater <- (distWater-mean.distWater)/sd.distWater     # Standardise distWater
 distWater[is.na(distWater)] <- 0               # Impute zeroes (means)
+
+mean.distEdge <- mean(distEdge, na.rm = TRUE)
+sd.distEdge <- sd(distEdge[!is.na(distEdge)])
+distEdge <- (distEdge-mean.distEdge)/sd.distEdge     # Standardise distEdge
+distEdge[is.na(distEdge)] <- 0               # Impute zeroes (means)
 
 mean.elevation <- mean(elevation, na.rm = TRUE)
 sd.elevation <- sd(elevation[!is.na(elevation)])
@@ -67,6 +74,11 @@ sd.treeDensity <- sd(treeDensity[!is.na(treeDensity)])
 treeDensity <- (treeDensity-mean.treeDensity)/sd.treeDensity     # Standardise treeDensity
 treeDensity[is.na(treeDensity)] <- 0               # Impute zeroes (means)
 
+mean.basalArea <- mean(basalArea, na.rm = TRUE)
+sd.basalArea <- sd(basalArea[!is.na(basalArea)])
+basalArea <- (basalArea-mean.basalArea)/sd.basalArea     # Standardise basalArea
+basalArea[is.na(basalArea)] <- 0               # Impute zeroes (means)
+
 
 #----- 4 - Single-season occupancy model -----
 
@@ -77,10 +89,11 @@ model {
 
 # Priors
 alpha.psi ~ dnorm(0, 0.01)
-beta1.psi ~ dnorm(0, 0.01) # dist.water
-beta2.psi ~ dnorm(0, 0.01) # elevation
-beta3.psi ~ dnorm(0, 0.01) # tree.density
-beta4.psi ~ dnorm(0, 0.01) # burned.trees
+beta1.psi ~ dnorm(0, 0.01) # distEdge
+beta2.psi ~ dnorm(0, 0.01) # distWater
+beta3.psi ~ dnorm(0, 0.01) # elevation
+beta4.psi ~ dnorm(0, 0.01) # basalArea
+beta5.psi ~ dnorm(0, 0.01) # treeBurned
 alpha.p ~ dnorm(0, 0.01)
 #beta1.p ~ dnorm(0, 0.01)
 #beta2.p ~ dnorm(0, 0.01)
@@ -93,7 +106,7 @@ for (i in 1:R) {
    z[i] ~ dbern(psi[i])                # True occurrence z at site i
    psi[i] <- 1 / (1 + exp(-lpsi.lim[i]))
    lpsi.lim[i] <- min(999, max(-999, lpsi[i]))
-   lpsi[i] <- alpha.psi + beta1.psi * distWater[i] + beta2.psi * elevation[i] + beta3.psi * treeDensity[i] + beta4.psi * treeBurned[i]
+   lpsi[i] <- alpha.psi + beta1.psi*distEdge[i] + beta2.psi*distWater[i] + beta3.psi*elevation[i] + beta4.psi*basalArea[i] + beta5.psi*treeBurned[i]
 
    # Observation model for the observations
    for (j in 1:T) {
@@ -114,7 +127,7 @@ mean.p <- exp(alpha.p) / (1 + exp(alpha.p))    # Sort of average detection
 sink()
 
 # Bundle data
-dataJAGS <- list(y = y, R = nrow(y), T = ncol(y), distWater=distWater, elevation=elevation, treeDensity=treeDensity, treeBurned=treeBurned)
+dataJAGS <- list(y = y, R = nrow(y), T = ncol(y), distEdge=distEdge, distWater=distWater, elevation=elevation, basalArea=basalArea, treeBurned=treeBurned)
 
 # Initial values
 zst <- apply(y, 1, max, na.rm = TRUE)	# Good starting values crucial
@@ -122,7 +135,7 @@ zst[zst == -Inf] <- 0
 inits <- function(){list(z = zst, alpha.psi=runif(1, -3, 3), alpha.p = runif(1, -3, 3))}
 
 # Parameters monitored
-params <- c("alpha.psi", "beta1.psi", "beta2.psi", "beta3.psi", "beta4.psi", "mean.p", "occ.fs", "alpha.p", "z")
+params <- c("alpha.psi", "beta1.psi", "beta2.psi", "beta3.psi", "beta4.psi", "beta5.psi", "mean.p", "occ.fs", "alpha.p", "z")
 
 # MCMC settings
 ni <- 30000
@@ -140,38 +153,73 @@ print(out, dig = 2)
 hist(out$BUGSoutput$sims.list$occ.fs, nclass = 30, col = "gray", main = "", xlab = "Number of occupied sites", )
 #abline(v = 10, lwd = 2) # The observed number
 
+## Basal area was significant for Priodontes maximus
+# Make plots
 
-# A template for a figure with effect of a covariate on occupancy with uncertainty:
-# Using elevation as a model
+# Basal area
 mcmc.sample <- out$BUGSoutput$n.sims
-original.elev <- SiteCovs[,4]
-original.elev.pred <- seq(min(original.elev), max(original.elev), length.out = 30)
-elev.pred <- (original.elev.pred - mean.elevation)/sd.elevation
-p.pred.elev <- rep(NA, length(elev.pred))
-for(i in 1:length(p.pred.elev)) {
-  p.pred.elev[i] <- plogis(out$BUGSoutput$mean$alpha.psi + out$BUGSoutput$mean$beta2.psi*elev.pred[i])
+original.basalArea <- SiteCovs[,7]
+original.basalArea <- seq(min(original.basalArea), max(original.basalArea), length.out = 30)
+basalArea <- (original.basalArea - mean.basalArea)/sd.basalArea
+psi.pred.basalArea <- rep(NA, length(basalArea))
+for(i in 1:length(psi.pred.basalArea)) {
+  psi.pred.basalArea[i] <- plogis(out$BUGSoutput$mean$alpha.psi + out$BUGSoutput$mean$beta4.psi*basalArea[i])
 }
-array.p.pred.elev <- array(NA, dim = c(length(elev.pred), mcmc.sample))
+array.psi.pred.basalArea <- array(NA, dim = c(length(basalArea), mcmc.sample))
 for (i in 1:mcmc.sample){
-  array.p.pred.elev[,i] <- plogis(out$BUGSoutput$sims.list$alpha.psi[i] + out$BUGSoutput$sims.list$beta2.psi[i]*elev.pred)
+  array.psi.pred.basalArea[,i] <- plogis(out$BUGSoutput$sims.list$alpha.psi[i] + out$BUGSoutput$sims.list$beta4.psi[i]*basalArea)
 }
 
 # Plot for a subsample of MCMC draws
 # write as a function:
-plot.test <- function() {
+plot.basalArea <- function() {
   sub.set <- sort(sample(1:mcmc.sample, size = 200))
 
-  plot(original.elev.pred, p.pred.elev, main = "", ylab = "Occupancy probability", xlab = "Elevation (m)", ylim = c(0, 1), type = "l", lwd = 3, frame.plot = FALSE)
+  plot(original.basalArea, psi.pred.basalArea, main = "", ylab = "Occupancy probability", xlab = "Basal area of trees (m2/ha)", ylim = c(0, 1), type = "l", lwd = 3, frame.plot = FALSE)
   for (i in sub.set){
-    lines(original.elev.pred, array.p.pred.elev[,i], type = "l", lwd = 1, col = "gray")
+    lines(original.basalArea, array.psi.pred.basalArea[,i], type = "l", lwd = 1, col = "gray")
   }
-  lines(original.elev.pred, p.pred.elev, type = "l", lwd = 3, col = "blue")
+  lines(original.basalArea, psi.pred.basalArea, type = "l", lwd = 3, col = "blue")
 }
 
-plot.test()
+plot.basalArea()
 
 # save as jpeg
-jpeg(here("results", "elevation_effect_test.jpg"), width = 800, height = 400) # Open jpeg file
-plot.test()
+jpeg(here("results", "basalArea_effect_Pmaximus.jpg"), width = 800, height = 400) # Open jpeg file
+plot.basalArea()
+dev.off()
+
+
+## Elevation
+mcmc.sample <- out$BUGSoutput$n.sims
+original.elevation <- SiteCovs[,5]
+original.elevation <- seq(min(original.elevation), max(original.elevation), length.out = 30)
+elevation <- (original.elevation - mean.elevation)/sd.elevation
+psi.pred.elev <- rep(NA, length(elevation))
+for(i in 1:length(psi.pred.elev)) {
+  psi.pred.elev[i] <- plogis(out$BUGSoutput$mean$alpha.psi + out$BUGSoutput$mean$beta3.psi*elevation[i])
+}
+array.psi.pred.elev <- array(NA, dim = c(length(elevation), mcmc.sample))
+for (i in 1:mcmc.sample){
+  array.psi.pred.elev[,i] <- plogis(out$BUGSoutput$sims.list$alpha.psi[i] + out$BUGSoutput$sims.list$beta3.psi[i]*elevation)
+}
+
+# Plot for a subsample of MCMC draws
+# write as a function:
+plot.elevation <- function() {
+  sub.set <- sort(sample(1:mcmc.sample, size = 200))
+  
+  plot(original.elevation, psi.pred.elev, main = "", ylab = "Occupancy probability", xlab = "Elevation (m)", ylim = c(0, 1), type = "l", lwd = 3, frame.plot = FALSE)
+  for (i in sub.set){
+    lines(original.elevation, array.psi.pred.elev[,i], type = "l", lwd = 1, col = "gray")
+  }
+  lines(original.elevation, psi.pred.elev, type = "l", lwd = 3, col = "blue")
+}
+
+plot.elevation()
+
+# save as jpeg
+jpeg(here("results", "elevation_effect_Pmaximus.jpg"), width = 800, height = 400) # Open jpeg file
+plot.elevation()
 dev.off()
 

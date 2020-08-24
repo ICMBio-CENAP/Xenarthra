@@ -147,6 +147,10 @@ names(dist.water)[4] <- "dist.water"
 dist.water$Camera.Trap.Name <- gsub("Ctrbg", "CT-RBG-", dist.water$Camera.Trap.Name)
 dist.water$Camera.Trap.Name <- gsub("Ctrgb", "CT-RBG-", dist.water$Camera.Trap.Name)
 
+# Distance to forest edge
+dist.edge <- read.csv(here("data", "dist_to_edge.csv"))
+names(dist.edge) <- c("Camera.Trap.Name", "dis.to.edge")
+
 # Slope
 slope.elev <- read.csv(here("data", "slope_altitd_pt_cam.csv"))
 #names(slope.elev)[2] <- "Camera.Trap.Name"
@@ -159,7 +163,8 @@ trees <- read.csv(here("data", "tree_structure.csv"))
 
 
 ## create a single covariates dataframe
-covars <- merge(cover[,c(2,9)], dist.water[,3:4], by="Camera.Trap.Name")
+covars <- merge(cover[,c(2,7)], dist.water[,3:4], by="Camera.Trap.Name")
+covars <- merge(covars, dist.edge[,1:2], by="Camera.Trap.Name")
 covars <- merge(covars, slope.elev[,2:4], by="Camera.Trap.Name")
 covars <- merge(covars, trees[,c(2,4,6,7)], by="Camera.Trap.Name")
 
