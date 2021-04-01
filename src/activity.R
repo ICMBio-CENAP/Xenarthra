@@ -1,4 +1,7 @@
 
+#Blablabla xenarthras são legais
+
+
 ##---- Activity patterns ---------------------------
 
 # Write a couple of functions for activity patterns
